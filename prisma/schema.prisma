@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url      = "file:./local.db"
+}
+
+enum unitType {
+  un
+  kg
+}
+
+enum payMethod{
+  credit_card
+  cash
+  pix
+}
+
+model Product {
+  id Int @id @default(autoincrement()) @unique
+  name String
+  price Float
+  unitType unitType
+  inStock Boolean
+  ItemSale ItemSale[]
+}
+
+model ItemSale {
+  id String @id @default(uuid())
+  productId Int 
+  product Product @relation(fields: [productId], references: [id])
+  quantity Float
+  unitPrice Float
+  sale Sale @relation(fields: [saleId], references: [id])
+  saleId String
+}
+
+model Sale {
+  id String @id @default(uuid())
+  method payMethod
+  value Float
+  date DateTime @default(now())
+  itens ItemSale[]
+}
