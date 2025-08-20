@@ -1,34 +1,25 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import Nav from './components/Nav'
+import Products from './Products'
+import { Toaster } from './components/ui/sonner'
+import POSPage from './Sale'
+import type { CartItem } from './lib/types'
+
 
 function App() {
-  const [count, setCount] = useState(0)
-
+  const [currentTab, setCurrentTab] = useState('sales')
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const pages = {
+    Sales: <POSPage cart={cart} setCart={setCart}/>,
+    Products: <Products/>
+  }
+  document.documentElement.classList.add("dark")
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className='flex flex-col h-screen w-screen'>
+      <Toaster richColors position='top-center'/>
+      <Nav currentTab={currentTab} setCurrentTab={setCurrentTab}/>
+      {pages[currentTab] ?? <div>404</div>}
+    </div>
   )
 }
 

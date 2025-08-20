@@ -9,6 +9,9 @@ import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import ProductModal from './components/ProductModal';
 import type { Params } from './lib/types';
+import { toast } from 'sonner';
+import { Switch } from './components/ui/switch';
+import { Card, CardContent } from './components/ui/card';
 
 function Products(){
     const [data, setData] = useState<Product[]>([])
@@ -19,9 +22,14 @@ function Products(){
     const [queryValue, setQuery] = useState('')
 
     async function deleteProduct(id:string) {
-        const res = await window.api.deleteProduct(id);
-        if(res.id != id) console.log('erro') // usar um toast de erro
-        fetchProducts();
+        try {
+            const res = await window.api.deleteProduct(id);
+            fetchProducts();
+        } catch (e) {
+            toast.error('Não foi possível deletar o produto', {
+                description: <div>{(e as Error).message}</div>
+            })
+        }
     }
 
     async function fetchProducts() {
@@ -31,17 +39,32 @@ function Products(){
     }
 
     async function createItem(p: Params){
-        const res = await window.api.addProduct(p)
-        setopenNewDialog(false)
-        fetchProducts()
-
+        try {
+            const res = await window.api.addProduct(p)
+            setopenNewDialog(false)
+            fetchProducts()
+        } catch (e) {
+            toast.error('Não foi possível criar o produto', {
+                description: <div>{(e as Error).message}</div>
+            })
+        }
     }
 
     async function updateItem(p: Params){
-        const res = await window.api.updateProduct(p)
-        setopenEditDialog(false)
-        fetchProducts()
+        try {
+            const res = await window.api.updateProduct(p)
+            setopenEditDialog(false)
+            fetchProducts()
+        } catch (e) {
+            toast.error('Não foi possível criar o produto', {
+                description: <div>{(e as Error).message}</div>
+            })
+        }
+    }
 
+    async function toggleItem(id:string) {
+        await window.api.toggleProductState(id);
+        fetchProducts()
     }
 
     useEffect(() => {
@@ -83,7 +106,7 @@ function Products(){
     
  
     return(
-        <div className="w-screen h-screen">
+        <div className="max-w-screen h-11/12">
         <ProductModal open={openEditDialog} setOpen={setopenEditDialog} defaultValues={productToEdit} callback={updateItem}/>
         <ProductModal open={openNewDialog} setOpen={setopenNewDialog} callback={createItem} />
     <div className="w-screen overflow-hidden h-4/5 my-5 mx-auto flex justify-center">
@@ -94,7 +117,9 @@ function Products(){
             </div>
             <div className="max-h-full">
                 <ScrollArea className="h-full">
-                    <Table>
+                    <Card>
+                        <CardContent>
+                            <Table>
                         <TableHeader className="sticky top-0 z-10 bg-primary">
                             <TableRow>
                                 <TableHead className="sticky top-0 text-white">Produto</TableHead>
@@ -111,8 +136,8 @@ function Products(){
                                             <TableCell>{item.name}</TableCell>
                                             <TableCell>{item.id}</TableCell>
                                             <TableCell>{item.price.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}/{item.unitType}</TableCell>
-                                            <TableCell>{item.inStock?<Check className="mx-auto" />:''}</TableCell>
-                                            <TableCell>
+                                            <TableCell className='text-center'><Switch checked={item.inStock} onCheckedChange={() => {toggleItem(item.id)}}/></TableCell>
+                                            <TableCell className='flex gap-2'>
                                                 <Pencil onClick={() => {setopenEditDialog(true); setProductToEdit(item)}}/>
                                                 <Trash className='hover:cursor-pointer' onClick={() => {deleteProduct(item.id)}} />
                                             </TableCell>
@@ -121,6 +146,8 @@ function Products(){
                                 })}
                             </TableBody>
                     </Table>
+                        </CardContent>
+                    </Card>
                 </ScrollArea>
             </div>
         </div>

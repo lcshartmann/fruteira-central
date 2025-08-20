@@ -2,13 +2,15 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Params } from '../src/lib/types'
-
+import type { Params, PortData } from '../src/lib/types'
+const { createRequire } = await import('module')
+const require = createRequire(import.meta.url)
+const { SerialPort, ReadlineParser } = require('serialport')
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 let prisma: any
-
+let currentWeight = 0;
 async function initPrisma() {
   const dbPath = app.isPackaged
     ? path.join(process.resourcesPath, 'local.db')
@@ -16,11 +18,24 @@ async function initPrisma() {
 
   process.env.DATABASE_URL = `sqlite:${dbPath}`
 
-  const { createRequire } = await import('module')
-  const require = createRequire(import.meta.url)
+  
   const { PrismaClient } = require('@prisma/client')
   prisma = new PrismaClient()
 }
+
+const port = new SerialPort({
+  path: 'COM8',
+  baudRate: 4800,
+  dataBits: 8,
+  parity: 'none',
+  stopBits: 1
+})
+
+const parser = port.pipe(new ReadlineParser({ delimiter: '\r' }))
+ parser.on('data', (line:any) => {
+  currentWeight = Number(Number(line.trim().slice(1)).toFixed(2))
+  
+})
 
 
 ipcMain.handle('product:getAll', async () => {
@@ -38,7 +53,6 @@ ipcMain.handle('product:getAll', async () => {
 
 ipcMain.handle('product:add', async (_event ,p: Params) => {
   if (!prisma) throw new  Error('Prisma não inicializado')
-    console.log(typeof p.price)
   const res = await prisma.product.create({data: {
       name:p.name,
       price:p.price,
@@ -50,38 +64,40 @@ ipcMain.handle('product:add', async (_event ,p: Params) => {
 
 ipcMain.handle('product:delete', async (_event, id: string) => {
   if (!prisma) throw new Error('Prisma não inicializado')
-  try {
-    return await prisma.product.delete({
-    where: {
-      id: id
-    }
-    })
-  } catch (e) {
-    return e
+  return await prisma.product.delete({
+  where: {
+    id: id
   }
-  
-
+  })
 })
 
 ipcMain.handle('product:update', async (_event, p: Params) => {
   if(!prisma) throw new Error('Prisma não inicilizado')
-  try {
-      const res = await prisma.product.update({
-      where: {
-        id: p.id
-      },
-      data: {
-        name: p.name,
-        price: p.price,
-        unitType: p.type,
-      }
-    })
-    return res;
-  } catch (e) {
-    return e;
-  }
+    const res = await prisma.product.update({
+    where: {
+      id: p.id
+    },
+    data: {
+      name: p.name,
+      price: p.price,
+      unitType: p.type,
+    }
+  })
+  return res;
+  
 })
 
+ipcMain.handle('product:toggle', async (_event, id: string) => {
+  await prisma.$executeRaw`
+  UPDATE "Product"
+  SET "inStock" = NOT "inStock"
+  WHERE "id" = ${id}
+`
+})
+ipcMain.handle('scale:read', () => {
+  if(!currentWeight) throw new Error('Scale not avaliable')
+  return currentWeight
+})
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
