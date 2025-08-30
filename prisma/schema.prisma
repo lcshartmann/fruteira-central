@@ -38,14 +38,17 @@ model ItemSale {
   product Product @relation(fields: [productId], references: [id])
   quantity Float
   unitPrice Float
-  sale Sale @relation(fields: [saleId], references: [id])
+  sale Sale @relation(fields: [saleId], references: [uuid])
   saleId String
 }
 
 model Sale {
-  id String @id @default(uuid())
+  uuid String @default(uuid()) @unique
+  saleNumber  Int @id @unique @default(autoincrement())
   method payMethod
-  value Float
+  subtotal Float
+  discount Float @default(0)
+  total Float
   date DateTime @default(now())
-  itens ItemSale[]
+  items ItemSale[]
 }
