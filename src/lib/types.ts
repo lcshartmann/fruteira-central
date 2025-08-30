@@ -37,3 +37,25 @@ export type CartItem = {
    baudrate: number,
    databits: number
  }
+
+ export type Sale = {
+    method: 'cash' | 'card' | 'pix',
+    subtotal: number,
+    discount: number,
+    total: number,
+    items: CartItem[]
+}
+
+export interface AppConfig {
+    theme: 'light' | 'dark';
+    devices: { 
+        scale?: {
+            name: string,
+            pid: number,
+            vid: number,
+            path: string,
+            baudRate: number,
+            databits: number,
+        }
+}
+}
