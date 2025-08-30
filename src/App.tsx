@@ -1,19 +1,22 @@
-import { useState } from 'react'
+import { useState, type JSX } from 'react'
 import Nav from './components/Nav'
 import Products from './Products'
 import { Toaster } from './components/ui/sonner'
 import POSPage from './Sale'
 import type { CartItem } from './lib/types'
+import Settings from './Settings'
 
 
 function App() {
-  const [currentTab, setCurrentTab] = useState('sales')
+  const [currentTab, setCurrentTab] = useState<string>('Sales')
   const [cart, setCart] = useState<CartItem[]>([]);
-  const pages = {
+  const pages: Record<string, JSX.Element> = {
     Sales: <POSPage cart={cart} setCart={setCart}/>,
-    Products: <Products/>
+    Products: <Products/>,
+    Settings: <Settings/>,
   }
-  document.documentElement.classList.add("dark")
+  
+  document.documentElement.classList.add('dark')
   return (
     <div className='flex flex-col h-screen w-screen'>
       <Toaster richColors position='top-center'/>

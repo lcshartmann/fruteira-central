@@ -9,6 +9,11 @@ import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { ScrollArea } from "./components/ui/scroll-area";
 import type { Product, CartItem } from "./lib/types";
+import clsx from "clsx";
+
+
+
+
 /**
  * POS (PDV) — Página única em React
  * - Busca por produto (nome/sku)
@@ -57,15 +62,27 @@ export default function POSPage({cart, setCart}: {cart: CartItem[], setCart: Rea
   const [discountSalePercent, setDiscountSalePercent] = useState(0); // %
   const [payOpen, setPayOpen] = useState(false);
   const [payAmount, setPayAmount] = useState(0);
-  const [payMethod, setPayMethod] = useState<'cash' | 'card' | 'mixed'>('cash');
+  const [payMethod, setPayMethod] = useState<'cash' | 'card' | 'pix'>('cash');
+  const [isScaleConnected, setScaleStatus] = useState<boolean>(false);
+  const [isPrinterConnected, setPrinterStatus] = useState<boolean>(false);
   const skuRef = useRef<HTMLInputElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
+  
 
-
-  // Focar no SKU ao carregar
+  // Focar no SKU ao carregar e escutar status de periféricos
   useEffect(() => {
     skuRef.current?.focus();
+    
+    const getStatus = async () => {
+      const scale = await window.api.getScaleStatus();
+      const printer = await window.api.getPrinterStatus();
+      setScaleStatus(scale);
+      setPrinterStatus(printer);
+    }
+    getStatus();
+    window.api.scaleStatus(setScaleStatus);
+    window.api.printerStatus(setPrinterStatus);
   }, []);
 
   // Filtragem por nome
@@ -102,7 +119,11 @@ export default function POSPage({cart, setCart}: {cart: CartItem[], setCart: Rea
     if (!code) return;
     const found = catalog!.find(p => p.id == code);
     if (found){
-      const weight = await window.api.readScale();
+      let weight;
+      if(found.unitType === "kg"){
+        weight = await readScale();
+        if(Number(weight) <= 0) return
+      }
       addToCart(found, found.unitType === "kg" ? Number(weight) : 1)
     }
     setSku("");
@@ -122,9 +143,16 @@ export default function POSPage({cart, setCart}: {cart: CartItem[], setCart: Rea
     skuRef.current?.focus();
   };
 
-  const finalizePayment = () => {
+  const finalizePayment = async () => {
     
-    window.print?.();
+    const sale = {
+      method: payMethod,
+      subtotal,
+      discount: saleDiscount,
+      total,
+      items: cart
+    }
+    const res = await window.api.registerSale(sale)
     newSale();
     setPayOpen(false);
   };
@@ -147,7 +175,28 @@ export default function POSPage({cart, setCart}: {cart: CartItem[], setCart: Rea
         const avaliableProducts = data.filter((p) => p.inStock == true)
         setCatalog(avaliableProducts);
     }
-
+  
+  async function readScale(){
+    const maxRetries = 5;
+    const delay = 500 //ms
+    let attempt = 0;
+    while(attempt < maxRetries){
+      try {
+        const weight = await window.api.readScale(new Date());
+        return weight;
+      } catch (error) {
+        if(error instanceof Error && error.message === 'No recent weight data' ){
+          attempt++;
+          await new Promise(res => setTimeout(res, delay));
+        } else{
+        alert("Erro ao ler balança: " + error);
+        return 0;
+        }
+      }
+  }
+  alert("Não foi possível ler o peso da balança. Verifique a conexão.");
+  return 0;
+}
     useEffect(() => {
         fetchProducts();
     },[])
@@ -202,7 +251,16 @@ export default function POSPage({cart, setCart}: {cart: CartItem[], setCart: Rea
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-xl"><ScanLine className="h-5 w-5"/>Catálogo</CardTitle>
+              <CardTitle className="flex items-center justify-between gap-2 text-xl">
+                <div className="flex items-center gap-2">
+                  <ScanLine className="h-5 w-5"/>Catálogo
+                  <div>{filtered ? `(${filtered.length} de ${catalog?.length || 0})` : ''}</div>
+                </div>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1 mx-1"><div className={clsx('w-2 h-2 rounded-full', isScaleConnected ? 'bg-green-500' : 'bg-red-500')}/> Balança </div> /
+                  <div className="flex items-center gap-1 mx-1"><div className={clsx('w-2 h-2 rounded-full', isPrinterConnected ? 'bg-green-500' : 'bg-red-500')}/> Impressora</div>
+                </div>
+                </CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-64 pr-2">
@@ -211,8 +269,13 @@ export default function POSPage({cart, setCart}: {cart: CartItem[], setCart: Rea
                     <motion.button
                       key={p.id}
                       onClick={async () => {
-                        const weight =await  window.api.readScale()
-                        addToCart(p, p.unitType === 'kg' ?  Number(weight) : 1)}}
+                        if(p.unitType === "kg"){
+                          const weight = await readScale();
+                          if(Number(weight) > 0) return
+                          addToCart(p, Number(weight))
+                        } else {  
+                          addToCart(p, 1)}}
+                        }
                       whileTap={{ scale: 0.98 }}
                       className="text-left rounded-2xl border p-3 hover:shadow focus:outline-none focus:ring"
                     >
@@ -311,7 +374,7 @@ export default function POSPage({cart, setCart}: {cart: CartItem[], setCart: Rea
             <div className="grid grid-cols-3 gap-2">
               <Button variant={payMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPayMethod('cash')}>Dinheiro</Button>
               <Button variant={payMethod === 'card' ? 'default' : 'outline'} onClick={() => setPayMethod('card')}>Cartão</Button>
-              <Button variant={payMethod === 'mixed' ? 'default' : 'outline'} onClick={() => setPayMethod('mixed')}>Misto</Button>
+              <Button variant={payMethod === 'pix' ? 'default' : 'outline'} onClick={() => setPayMethod('pix')}>Pix</Button>
             </div>
             <div className="flex items-center gap-2">
               <Label className="w-28">Recebido (R$)</Label>
